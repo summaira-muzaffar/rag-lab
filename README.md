@@ -1,60 +1,92 @@
-# RAG Lab: plain RAG + LLM
+# RAG Lab
 
-## Architecture
+Ask questions about your own documents. The app finds the most relevant passages, gives them to Gemini, and answers with citations like `[1]`.
+
+## Quick start
+
+| Step | Windows | Mac / Linux |
+|---|---|---|
+| 1. Create environment | `python -m venv .venv` | `python -m venv .venv` |
+| 2. Activate it | `.venv\Scripts\activate` | `source .venv/bin/activate` |
+| 3. Install | `pip install -r requirements.txt` | `pip install -r requirements.txt` |
+| 4. Create settings file | `copy .env.example .env` | `cp .env.example .env` |
+| 5. Add your key | Open `.env`, set `GEMINI_API_KEY=...` | same |
+| 6. Build the index | `python ingest.py` | `python ingest.py` |
+| 7. Ask | `python ask.py "How many sick days do I get?"` | same |
+
+Get a free key at [aistudio.google.com](https://aistudio.google.com) > **Get API key**.
+The first `ingest.py` run downloads a small embedding model, so it takes a minute.
+
+No key yet? Set `LLM_BACKEND=echo` in `.env` to see only the retrieved text.
+
+## Ways to run it
+
+| Want | Command |
+|---|---|
+| Terminal Q&A | `python ask.py` |
+| Web app (chat UI) | `streamlit run app.py --server.fileWatcherType none` |
+| Web API (docs at `/docs`) | `uvicorn api:app --reload` |
+| Retrieval score | `python evaluate.py` |
+
+In the web app, click **Build / rebuild index** in the sidebar once before asking.
+
+## Use your own documents
+
+1. Put `.md`, `.txt` or `.pdf` files in `data/docs/`.
+2. Run `python ingest.py` again.
+3. Replace `eval/questions.json` with 20-30 questions about your files.
+
+## Settings (`.env`)
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `GEMINI_API_KEY` | none | Your Gemini key. Never commit `.env`. |
+| `GEMINI_MODEL` | `gemini-2.5-flash-lite` | Model used to write answers |
+| `LLM_BACKEND` | `gemini` | `gemini` or `echo` (no LLM) |
+| `EMBED_BACKEND` | `local` | `local` (real model) or `hash` (offline test) |
+| `CHUNK_SIZE` | `500` | Characters per chunk |
+| `CHUNK_OVERLAP` | `80` | Characters shared between chunks |
+| `TOP_K` | `4` | Passages sent to the LLM |
+
+## How it works
 
 ```
-INGEST (run once)                              ASK (every question)
-data/docs/*.md|txt|pdf                         user question
-   |  loader.py   read files                      |  embedder.py   question -> vector
-   v                                              v
- Documents                                     store.py    find top-k similar chunks
-   |  chunker.py  split + overlap                 |  retriever.py
-   v                                              v
- Chunks                                        llm.py      prompt = context + question
-   |  embedder.py text -> vectors                 |         LLM answers + cites [1] [2]
-   v                                              v
- store.py  ChromaDB (saved in chroma_db/)      Answer + sources
+INGEST (once)                         ASK (every question)
+documents -> chunks -> vectors        question -> vector -> top-k chunks
+          -> saved in chroma_db/                         -> Gemini -> answer + sources
 ```
 
 | File | Job |
 |---|---|
-| `config.py` | All settings (chunk size, top_k, models) |
+| `config.py` | All settings |
 | `rag/loader.py` | Read .md / .txt / .pdf |
 | `rag/chunker.py` | Split text into overlapping chunks |
-| `rag/embedder.py` | Text to vectors (local model, or offline test mode) |
+| `rag/embedder.py` | Text to vectors |
 | `rag/store.py` | ChromaDB: save and search vectors |
 | `rag/retriever.py` | Question to top-k chunks |
-| `rag/llm.py` | Prompt + Claude call (or echo mode) |
-| `rag/pipeline.py` | Connects everything: `ingest()` and `ask()` |
-| `ingest.py` / `ask.py` / `api.py` / `evaluate.py` | Entry points |
+| `rag/llm.py` | Prompt + Gemini call (or echo mode) |
+| `rag/pipeline.py` | Connects everything |
+| `ingest.py`, `ask.py`, `evaluate.py` | Command-line tools |
+| `app.py` | Streamlit chat app |
+| `api.py` | FastAPI web API |
 
-## Run it
+## Troubleshooting
 
-```bash
-python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env                                    # add your ANTHROPIC_API_KEY
+| Problem | Fix |
+|---|---|
+| `API key not valid` | Check `.env`: no quotes, no spaces around `=` |
+| `429` error | Free tier limit. Wait a minute and retry |
+| Answer is "I don't know based on the documents" | The documents don't cover it. This is correct behavior |
+| No results or empty answers | Run `python ingest.py` again |
 
-python ingest.py                  # build the vector DB (first run downloads the embedding model)
-python ask.py "How many sick days do I get?"
-python evaluate.py                # retrieval score on eval/questions.json
-uvicorn api:app --reload          # optional web API at /docs
-```
+## Experiments
 
-No API key yet? Set `LLM_BACKEND=echo` to see only the retrieved text.
+Change one setting at a time, then re-run `python ingest.py` and `python evaluate.py`.
 
-## Put your own documents in
+| Setting | Try |
+|---|---|
+| `CHUNK_SIZE` | 200, 500, 1000 |
+| `TOP_K` | 1, 2, 4, 8 |
+| `CHUNK_OVERLAP` | 0, 80 |
 
-Drop PDFs or text files into `data/docs/`, rerun `python ingest.py`, and replace `eval/questions.json`
-with 20-30 questions about your files.
-
-## Experiments to learn from (change one thing at a time, rerun evaluate.py)
-
-1. `CHUNK_SIZE`: 200 vs 500 vs 1000
-2. `TOP_K`: 1, 2, 4, 8
-3. `CHUNK_OVERLAP`: 0 vs 80
-4. Ask something the docs don't cover and check you get "I don't know based on the documents."
-
-## Next upgrades (still plain RAG)
-
-Hybrid search (BM25 + vectors), a reranker, metadata filters, query rewriting, RAGAS evaluation, Streamlit UI, Docker.
+Next upgrades: hybrid search (BM25 + vectors), a reranker, metadata filters, query rewriting, RAGAS evaluation, Docker.
