@@ -1,0 +1,8 @@
+[
+  {"question": "How many days of annual leave do employees get?", "expected_source": "leave_policy.md", "keyword": "24 days"},
+  {"question": "When do I need a doctor's note for sick leave?", "expected_source": "leave_policy.md", "keyword": "3 consecutive days"},
+  {"question": "Which days must I work from the office?", "expected_source": "remote_work.md", "keyword": "Tuesday"},
+  {"question": "How much is the monthly internet allowance for remote work?", "expected_source": "remote_work.md", "keyword": "$40"},
+  {"question": "What is the minimum password length?", "expected_source": "security_policy.md", "keyword": "14 characters"},
+  {"question": "How fast must I report a lost laptop?", "expected_source": "security_policy.md", "keyword": "2 hours"}
+]
